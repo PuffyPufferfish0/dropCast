@@ -1,0 +1,8 @@
+/home/puffy/dropCast/build/CMakeFiles/edit_cache.dir
+/home/puffy/dropCast/build/CMakeFiles/rebuild_cache.dir
+/home/puffy/dropCast/build/Host/CMakeFiles/HostApp.dir
+/home/puffy/dropCast/build/Host/CMakeFiles/edit_cache.dir
+/home/puffy/dropCast/build/Host/CMakeFiles/rebuild_cache.dir
+/home/puffy/dropCast/build/Client/CMakeFiles/ClientApp.dir
+/home/puffy/dropCast/build/Client/CMakeFiles/edit_cache.dir
+/home/puffy/dropCast/build/Client/CMakeFiles/rebuild_cache.dir
