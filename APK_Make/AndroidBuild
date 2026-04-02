@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -e
+
+# Paths provided by our Nix Flake environment
+SDK=$ANDROID_SDK_ROOT
+NDK=$ANDROID_NDK_ROOT
+BUILD_TOOLS=$SDK/build-tools/34.0.0
+PLATFORM=$SDK/platforms/android-33
+
+echo "=== 1. Compiling Android Library (ARM64) ==="
+mkdir -p build_android
+cd build_android
+
+# We use CMake to cross-compile for the phone processor.
+# The '..' tells CMake to look in the APK_Make directory for the CMakeLists.txt
+cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+    -DANDROID_ABI=arm64-v8a \
+    -DANDROID_PLATFORM=android-33 \
+    -DCMAKE_BUILD_TYPE=Release
+
+make -j$(nproc)
+cd ..
+
+echo "=== 2. Packaging APK ==="
+APK_DIR="build_android/apk_staging"
+rm -rf $APK_DIR
+mkdir -p $APK_DIR/lib/arm64-v8a
+
+# Copy our compiled game library into the APK folder structure
+cp build_android/libmain.so $APK_DIR/lib/arm64-v8a/
+
+$BUILD_TOOLS/aapt package -f -M AndroidManifest.xml \
+    -I $PLATFORM/android.jar \
+    -F build_android/app-unaligned.apk \
+    $APK_DIR
+
+echo "=== 3. Aligning and Signing ==="
+$BUILD_TOOLS/zipalign -f 4 build_android/app-unaligned.apk build_android/app-aligned.apk
+
+# Generate a signing key if we don't have one
+if [ ! -f debug.keystore ]; then
+    echo "Generating debug keystore..."
+    keytool -genkeypair -validity 365 -dname "CN=DropCast" \
+        -keystore debug.keystore -storepass android -keypass android \
+        -alias androiddebugkey -keyalg RSA
+fi
+
+$BUILD_TOOLS/apksigner sign --ks debug.keystore \
+    --ks-pass pass:android build_android/app-aligned.apk
+
+mv build_android/app-aligned.apk DropCastHost.apk
+echo "=== SUCCESS: DropCastHost.apk has been created inside APK_Make! ==="
