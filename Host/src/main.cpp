@@ -32,13 +32,13 @@ int main() {
     memset(&clientAddr, 0, sizeof(clientAddr));
     clientAddr.sin_family = AF_INET;
     clientAddr.sin_port = htons(4444);
-    clientAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    clientAddr.sin_addr.s_addr = inet_addr("10.17.221.209");
 
     Vector2 playerPos = { 400.0f, 280.0f };
     float velocityY = 0.0f;
     bool canJump = false;
     
-    const float gravity = 800.0f; // Increased gravity for snappier jumping
+    const float gravity = 800.0f;
     const float playerJumpStrength = 450.0f;
     const float playerHorizSpeed = 300.0f;
 
@@ -61,47 +61,55 @@ int main() {
         // --- INPUT HANDLING (Keyboard + Touch) ---
         bool moveLeft = IsKeyDown(KEY_LEFT);
         bool moveRight = IsKeyDown(KEY_RIGHT);
-        bool jump = IsKeyPressed(KEY_SPACE); // Fixed: IsKeyPressed instead of IsKeyDown
+        bool jump = IsKeyPressed(KEY_SPACE);
 
-        // Check all potential simultaneous touch points (up to 10 fingers)
         for (int i = 0; i < GetTouchPointCount(); i++) {
             Vector2 touchPos = GetTouchPosition(i);
             if (CheckCollisionPointRec(touchPos, btnLeft)) moveLeft = true;
             if (CheckCollisionPointRec(touchPos, btnRight)) moveRight = true;
-            
-            // For touch, we allow holding the button to jump as soon as you touch the ground
             if (CheckCollisionPointRec(touchPos, btnJump)) jump = true; 
         }
-        // Also allow mouse clicks to simulate touch for testing on PC
+        
+        // Mouse click support for PC testing
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             Vector2 mousePos = GetMousePosition();
             if (CheckCollisionPointRec(mousePos, btnLeft)) moveLeft = true;
             if (CheckCollisionPointRec(mousePos, btnRight)) moveRight = true;
-            if (CheckCollisionPointRec(mousePos, btnJump)) jump = true;
+            // Use IsMouseButtonPressed so you don't auto-bunnyhop infinitely with the mouse
+            if (CheckCollisionPointRec(mousePos, btnJump) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) jump = true;
         }
 
         // --- UPDATE LOGIC ---
         if (moveLeft) playerPos.x -= playerHorizSpeed * deltaTime;
         if (moveRight) playerPos.x += playerHorizSpeed * deltaTime;
+        
+        // 1. Apply gravity to velocity
+        velocityY += gravity * deltaTime;
+
+        // 2. Jump logic
         if (jump && canJump) {
             velocityY = -playerJumpStrength;
             canJump = false;
         }
 
+        // 3. Move player
         playerPos.y += velocityY * deltaTime;
-        velocityY += gravity * deltaTime;
 
+        // 4. Proper Collision Detection (Only collide when falling down)
         bool hitObstacle = false;
-        for (auto& item : envItems) {
-            if (item.blocking &&
-                playerPos.x >= item.rect.x - 20 &&
-                playerPos.x <= item.rect.x + item.rect.width + 20 &&
-                playerPos.y >= item.rect.y - 40 &&
-                playerPos.y <= item.rect.y) 
-            {
-                hitObstacle = true;
-                velocityY = 0.0f;
-                playerPos.y = item.rect.y;
+        if (velocityY >= 0.0f) {
+            for (auto& item : envItems) {
+                if (item.blocking &&
+                    playerPos.x >= item.rect.x - 20 &&
+                    playerPos.x <= item.rect.x + item.rect.width + 20 &&
+                    playerPos.y >= item.rect.y &&             // Feet are AT or BELOW platform top
+                    playerPos.y <= item.rect.y + 30)          // 30px snap threshold so we don't snap from underneath
+                {
+                    hitObstacle = true;
+                    velocityY = 0.0f;
+                    playerPos.y = item.rect.y;
+                    break;
+                }
             }
         }
         canJump = hitObstacle;
@@ -119,7 +127,7 @@ int main() {
         Rectangle playerRect = { playerPos.x - 20, playerPos.y - 40, 40, 40 };
         DrawRectangleRec(playerRect, MAROON);
 
-        // Draw Touch Buttons (Semi-transparent)
+        // Draw Touch Buttons
         DrawRectangleRec(btnLeft, Fade(DARKGRAY, 0.5f));
         DrawText("<", btnLeft.x + 30, btnLeft.y + 25, 40, WHITE);
 

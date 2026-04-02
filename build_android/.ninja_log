@@ -1,0 +1,12 @@
+# ninja log v6
+2	66	1775168022972884090	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/utils.c.o	d3a5f2017694cc40
+2	77	1775168022973064740	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/nix/store/269h6gi4c20b0lzpwij3gnjrh75p7ywz-androidsdk/libexec/android-sdk/ndk/26.1.10909125/sources/android/native_app_glue/android_native_app_glue.c.o	8c7ded7a59c22022
+1	241	1775168022972162061	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rshapes.c.o	eb2f4a7476306472
+3	344	1775168022973519735	CMakeFiles/main.dir/Host/src/main.cpp.o	67d0883d50be9244
+1	1173	1775168022972319343	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rtext.c.o	9867dc4edac1748d
+1	1256	1775168022971154852	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rcore.c.o	3c98cfd4a95e143f
+2	3170	1775168022972674622	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rtextures.c.o	87f75afd3308cde4
+1	4098	1775168022971946615	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rmodels.c.o	f42b80c42021500c
+2	6742	1775168022973154746	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/raudio.c.o	78821b181c4ec9dd
+6742	6763	1775168029711798762	_deps/raylib-build/raylib/libraylib.a	cd3a3316a8c1407
+6763	6788	1775168029732797653	libmain.so	bc3a92606f20d1fe

@@ -23,6 +23,7 @@
       platformVersions = [ "33" "34" ];
       ndkVersions = [ "26.1.10909125" ]; 
       abiVersions = [ "arm64-v8a" "armeabi-v7a" ];
+      includeNDK = true;
     };
 
     # THE FIX: Use the Default/Intel wrapper, NOT the Nvidia one!
