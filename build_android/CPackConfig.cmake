@@ -10,7 +10,7 @@
 # usually begin with CPACK_<GENNAME>_xxxx.
 
 
-set(CPACK_BUILD_SOURCE_DIRS "/home/puffy/dropCast;/home/puffy/dropCast/build_android")
+set(CPACK_BUILD_SOURCE_DIRS "/home/puffy/dropCast/APK_Make;/home/puffy/dropCast/build_android")
 set(CPACK_CMAKE_GENERATOR "Ninja")
 set(CPACK_COMPONENT_UNSPECIFIED_HIDDEN "TRUE")
 set(CPACK_COMPONENT_UNSPECIFIED_REQUIRED "TRUE")

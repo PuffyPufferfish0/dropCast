@@ -9,13 +9,13 @@
 #include <fcntl.h>
 #include <cstring>
 
-// Must match the Host's struct exactly!
 struct GamePacket {
     float x;
     float y;
+    float velX;
+    float velY;
 };
 
-// The Map (Must match Host)
 struct EnvironmentItem {
     Rectangle rect;
     int blocking;
@@ -23,13 +23,11 @@ struct EnvironmentItem {
 };
 
 int main() {
-    // 1. Initialize Raylib
     const int screenWidth = 800;
     const int screenHeight = 450;
-    InitWindow(screenWidth, screenHeight, "DropCast Client - Display (With Camera)");
+    InitWindow(screenWidth, screenHeight, "DropCast Client - Display");
     SetTargetFPS(60);
 
-    // 2. Setup UDP Socket (Listening)
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) return -1;
 
@@ -43,13 +41,15 @@ int main() {
         std::cerr << "Failed to bind to port 4444!" << std::endl;
         return -1;
     }
-    fcntl(sock, F_SETFL, O_NONBLOCK); // Non-blocking!
+    fcntl(sock, F_SETFL, O_NONBLOCK);
 
-    // 3. Game & Camera State
-    GamePacket remotePlayer = { 400.0f, 280.0f }; 
+    // Setup for Dead Reckoning
+    GamePacket remotePlayer = { 400.0f, 280.0f, 0.0f, 0.0f }; 
+    GamePacket lastNetworkPacket = { 400.0f, 280.0f, 0.0f, 0.0f };
+    float timeSinceLastPacket = 0.0f;
+    const float gravity = 800.0f; // Must match the host's gravity!
     bool connected = false;
 
-    // We define the same map here so the client knows what to draw
     std::vector<EnvironmentItem> envItems = {
         {{ -500, 400, 2000, 200 }, 1, GRAY},
         {{ 300, 200, 400, 10 }, 1, DARKGRAY },
@@ -58,49 +58,70 @@ int main() {
         {{ 850, 250, 150, 10 }, 1, DARKGRAY }
     };
 
-    // Setup 2D Camera
     Camera2D camera = { 0 };
     camera.target = (Vector2){ remotePlayer.x, remotePlayer.y };
-    camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f }; // Keep player centered
+    camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f };
     camera.rotation = 0.0f;
-    camera.zoom = 1.0f; // Try setting this to 1.5f for a closer view!
+    camera.zoom = 1.0f;
 
-    // 4. Main Game Loop
     while (!WindowShouldClose()) {
+        float deltaTime = GetFrameTime();
         
-        // --- UPDATE (Listen for network data) ---
+        // 1. NETWORK DRAIN
         GamePacket incomingPacket;
-        int bytesRead = recvfrom(sock, &incomingPacket, sizeof(GamePacket), 0, NULL, NULL);
+        bool gotNewData = false;
         
-        if (bytesRead == sizeof(GamePacket)) {
-            remotePlayer = incomingPacket;
-            connected = true;
+        while (true) {
+            int bytesRead = recvfrom(sock, &incomingPacket, sizeof(GamePacket), 0, NULL, NULL);
+            if (bytesRead == sizeof(GamePacket)) {
+                lastNetworkPacket = incomingPacket;
+                connected = true;
+                gotNewData = true;
+            } else {
+                break; // Buffer is empty
+            }
         }
 
-        // Smoothly update camera target to follow the player
+        // 2. DEAD RECKONING MATH
+        if (gotNewData) {
+            timeSinceLastPacket = 0.0f; // Reset our blind-prediction timer
+        } else if (connected) {
+            timeSinceLastPacket += deltaTime; // Count how long we've been blind
+        }
+
+        // Predict exactly where the player should be using Physics (Position + Velocity*Time + 1/2*Accel*Time^2)
+        float predictedX = lastNetworkPacket.x + (lastNetworkPacket.velX * timeSinceLastPacket);
+        float predictedY = lastNetworkPacket.y + (lastNetworkPacket.velY * timeSinceLastPacket) + (0.5f * gravity * timeSinceLastPacket * timeSinceLastPacket);
+
+        // 3. APPLY SMOOTHING
+        if (timeSinceLastPacket > 1.0f) {
+            // If it's been over a full second, the network is dead. Just snap to position.
+            remotePlayer.x = predictedX;
+            remotePlayer.y = predictedY;
+        } else {
+            // Smoothly slide towards our predicted location
+            remotePlayer.x += (predictedX - remotePlayer.x) * 15.0f * deltaTime;
+            remotePlayer.y += (predictedY - remotePlayer.y) * 15.0f * deltaTime;
+        }
+
         camera.target.x = remotePlayer.x;
         camera.target.y = remotePlayer.y;
 
         // --- DRAW ---
         BeginDrawing();
-        ClearBackground(SKYBLUE); // Different background for the client
+        ClearBackground(SKYBLUE);
         
         if (connected) {
-            // Begin 2D mode with our tracking camera
             BeginMode2D(camera);
-
-            // Draw Environment
             for (auto& item : envItems) DrawRectangleRec(item.rect, item.color);
 
-            // Draw Remote Player
             Rectangle playerRect = { remotePlayer.x - 20, remotePlayer.y - 40, 40, 40 };
             DrawRectangleRec(playerRect, DARKBLUE);
+            EndMode2D();
 
-            EndMode2D(); // End Camera mode
-
-            // Draw HUD (UI is drawn OUTSIDE the camera mode so it stays on screen)
-            DrawText("CLIENT: Active Video Stream", 10, 10, 20, WHITE);
-            DrawText("Camera tracking Host coordinates...", 10, 35, 10, RAYWHITE);
+            DrawText("CLIENT: Dead Reckoning Active", 10, 10, 20, WHITE);
+            // Show exactly how long the Android OS is sleeping the Wi-Fi for debugging
+            DrawText(TextFormat("Blind Time: %.3f sec", timeSinceLastPacket), 10, 35, 20, (timeSinceLastPacket > 0.05f) ? RED : LIGHTGRAY);
         } else {
             ClearBackground(BLACK);
             DrawText("AWAITING VIDEO STREAM FROM HOST...", 220, 220, 20, GRAY);
@@ -110,7 +131,6 @@ int main() {
         EndDrawing();
     }
 
-    // 5. Cleanup
     close(sock);
     CloseWindow();
     return 0;

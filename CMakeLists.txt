@@ -1,24 +1,13 @@
-cmake_minimum_required(VERSION 3.15)
-project(DropCastAndroid)
+cmake_minimum_required(VERSION 3.20)
+project(DropCast VERSION 1.0 LANGUAGES CXX)
 
-# Tell Raylib to build for Android, NOT Desktop Linux!
-set(PLATFORM "Android" CACHE STRING "Target platform for Raylib" FORCE)
-set(BUILD_EXAMPLES OFF CACHE BOOL "Do not build examples" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Android requires compiling Raylib for ARM64 from source
-include(FetchContent)
-FetchContent_Declare(
-    raylib
-    URL https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz
-)
-FetchContent_MakeAvailable(raylib)
+# Find Raylib via PkgConfig (This uses the fast Nix Linux version)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(RAYLIB REQUIRED raylib)
 
-# Compile the Host code as an Android shared library (libmain.so)
-add_library(main SHARED ../Host/src/main.cpp)
-
-# CRITICAL FIX: Stop the C++ compiler from deleting the Android entry point!
-target_link_options(main PRIVATE "-Wl,-u,ANativeActivity_onCreate")
-
-# Link Android specific libraries alongside Raylib
-target_link_libraries(main PRIVATE raylib log android EGL GLESv2 OpenSLES m)
+# Tell CMake to look in these two folders next
+add_subdirectory(Host)
+add_subdirectory(Client)

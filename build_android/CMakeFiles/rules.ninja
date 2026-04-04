@@ -61,7 +61,7 @@ rule C_STATIC_LIBRARY_LINKER__raylib_Release
 # Rule for re-running cmake.
 
 rule RERUN_CMAKE
-  command = /nix/store/5qng39wihv3lfgr03cf7mqbg4lpf4m45-cmake-3.30.5/bin/cmake --regenerate-during-build -S/home/puffy/dropCast -B/home/puffy/dropCast/build_android
+  command = /nix/store/5qng39wihv3lfgr03cf7mqbg4lpf4m45-cmake-3.30.5/bin/cmake --regenerate-during-build -S/home/puffy/dropCast/APK_Make -B/home/puffy/dropCast/build_android
   description = Re-running CMake...
   generator = 1
 

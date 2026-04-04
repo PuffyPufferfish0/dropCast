@@ -1,4 +1,4 @@
-# Install script for directory: /home/puffy/dropCast
+# Install script for directory: /home/puffy/dropCast/APK_Make
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

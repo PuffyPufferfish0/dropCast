@@ -4,7 +4,7 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <!-- CRITICAL FIX: Tell the phone this app is built for modern Android -->
+    <!-- Tell the phone this app is built for modern Android -->
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33" />
 
     <!-- UDP Network permissions so the phone can talk to the PC -->
@@ -23,7 +23,7 @@
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:screenOrientation="landscape">
             
-            <!-- Tells Android to look for 'libmain.so' which we will compile -->
+            <!-- Tells Android to look for 'libmain.so' which we compiled -->
             <meta-data android:name="android.app.lib_name" android:value="main" />
             
             <intent-filter>

@@ -7,37 +7,34 @@ NDK=$ANDROID_NDK_ROOT
 BUILD_TOOLS=$SDK/build-tools/34.0.0
 PLATFORM=$SDK/platforms/android-33
 
-# Point directly to the Toolchain instead of searching for it!
+# Point directly to the Toolchain
 TOOLCHAIN="$NDK/build/cmake/android.toolchain.cmake"
 
-# Fallback just in case Nix used the older 'ndk-bundle' naming convention
 if [ ! -f "$TOOLCHAIN" ]; then
     TOOLCHAIN="$SDK/ndk-bundle/build/cmake/android.toolchain.cmake"
 fi
 
 if [ ! -f "$TOOLCHAIN" ]; then
-    echo "============================================================"
-    echo "ERROR: The NDK Toolchain is STILL missing!"
-    echo "This means your terminal is using the old environment."
-    echo ""
-    echo "CRITICAL STEP:"
-    echo "1. Type 'exit' and press Enter to leave this fish shell."
-    echo "2. Run 'nix develop --impure -c fish' to reload it."
-    echo "3. Run 'cd APK_Make' and try again."
-    echo "============================================================"
+    echo "ERROR: The NDK Toolchain is missing! Did you reload the Nix shell?"
+    exit 1
+fi
+
+# Safety check to ensure we run from the root folder
+if [ ! -d "APK_Make" ]; then
+    echo "ERROR: Could not find the 'APK_Make' folder! Make sure your Android Manifest and CMakeLists.txt are in there."
     exit 1
 fi
 
 echo "Found Toolchain: $TOOLCHAIN"
 
 echo "=== 1. Compiling Android Library (ARM64) ==="
-# CRITICAL FIX: Wipe the old CMake cache from the previous failed run!
 rm -rf build_android 
 mkdir -p build_android
 cd build_android
 
-# Use -G Ninja and the direct TOOLCHAIN path
-cmake .. -G Ninja \
+# CRITICAL FIX: We explicitly point CMake to ../APK_Make instead of ..
+# This guarantees it uses the Android configuration, not the PC configuration!
+cmake ../APK_Make -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
     -DANDROID_ABI=arm64-v8a \
     -DANDROID_PLATFORM=android-33 \
@@ -55,7 +52,8 @@ mkdir -p $APK_DIR/lib/arm64-v8a
 # Copy our compiled game library into the APK folder structure
 cp build_android/libmain.so $APK_DIR/lib/arm64-v8a/
 
-$BUILD_TOOLS/aapt package -f -M AndroidManifest.xml \
+# Explicitly use the Android Manifest from the APK_Make folder
+$BUILD_TOOLS/aapt package -f -M APK_Make/AndroidManifest.xml \
     -I $PLATFORM/android.jar \
     -F build_android/app-unaligned.apk \
     $APK_DIR
