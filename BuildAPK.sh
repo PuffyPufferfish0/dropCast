@@ -29,6 +29,7 @@ echo "Found Toolchain: $TOOLCHAIN"
 
 echo "=== 1. Compiling Android Library (ARM64) ==="
 rm -rf build_android 
+rm -f DropCastHost.apk # Failsafe: Nuke the old APK so we don't accidentally copy it!
 mkdir -p build_android
 cd build_android
 
@@ -73,4 +74,7 @@ $BUILD_TOOLS/apksigner sign --ks debug.keystore \
     --ks-pass pass:android build_android/app-aligned.apk
 
 mv build_android/app-aligned.apk DropCastHost.apk
-echo "=== SUCCESS: DropCastHost.apk has been created! ==="
+
+echo "==========================================================="
+echo "=== SUCCESS: DropCastHost.apk has been created!         ==="
+echo "==========================================================="

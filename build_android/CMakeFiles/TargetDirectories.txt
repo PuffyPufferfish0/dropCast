@@ -1,3 +1,4 @@
+/home/puffy/dropCast/build_android/CMakeFiles/lua_lib.dir
 /home/puffy/dropCast/build_android/CMakeFiles/main.dir
 /home/puffy/dropCast/build_android/CMakeFiles/package.dir
 /home/puffy/dropCast/build_android/CMakeFiles/package_source.dir

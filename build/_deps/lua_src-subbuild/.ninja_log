@@ -1,0 +1,21 @@
+# ninja log v6
+0	15	1775684042331479199	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-mkdir	26e5ff012662c0ea
+0	15	1775684042331479199	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-mkdir	26e5ff012662c0ea
+15	1373	1775684043689492026	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-download	384a5311d877378d
+15	1373	1775684043689492026	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-download	384a5311d877378d
+1373	1390	1775684043706492187	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-update	6aaed243ef84a4e4
+1373	1390	1775684043706492187	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-update	6aaed243ef84a4e4
+1390	1407	1775684043723492347	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-patch	c2ec64881c69bd6b
+1390	1407	1775684043723492347	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-patch	c2ec64881c69bd6b
+1407	1424	1775684043740492507	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-configure	bd24afc7b5c881e2
+1407	1424	1775684043740492507	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-configure	bd24afc7b5c881e2
+1424	1442	1775684043758492677	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-build	42fb506f926c809f
+1424	1442	1775684043758492677	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-build	42fb506f926c809f
+1442	1461	1775684043777492856	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-install	e10090a17c35f03b
+1442	1461	1775684043777492856	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-install	e10090a17c35f03b
+1461	1472	1775684043788492959	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-test	67498ab9da96cb34
+1461	1472	1775684043788492959	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-test	67498ab9da96cb34
+1472	1496	1775684043812493186	CMakeFiles/lua_src-populate-complete	75d4eaebb5e4028d
+1472	1496	1775684043812493186	lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-done	75d4eaebb5e4028d
+1472	1496	1775684043812493186	/home/puffy/dropCast/build/_deps/lua_src-subbuild/CMakeFiles/lua_src-populate-complete	75d4eaebb5e4028d
+1472	1496	1775684043812493186	/home/puffy/dropCast/build/_deps/lua_src-subbuild/lua_src-populate-prefix/src/lua_src-populate-stamp/lua_src-populate-done	75d4eaebb5e4028d

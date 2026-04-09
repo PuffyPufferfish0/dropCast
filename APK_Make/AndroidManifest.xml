@@ -4,17 +4,23 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <!-- Tell the phone this app is built for modern Android -->
+    <!-- CRITICAL FIX: Restored the SDK target so the phone knows it's a modern app! -->
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="33" />
 
-    <!-- UDP Network permissions so the phone can talk to the PC -->
+    <!-- Network permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- File Storage Permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
         android:hasCode="false"
         android:label="DropCast Host"
+        android:extractNativeLibs="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
         
         <activity
@@ -23,7 +29,6 @@
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:screenOrientation="landscape">
             
-            <!-- Tells Android to look for 'libmain.so' which we compiled -->
             <meta-data android:name="android.app.lib_name" android:value="main" />
             
             <intent-filter>

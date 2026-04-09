@@ -254,6 +254,26 @@ DropCast_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 DropCast_SOURCE_DIR:STATIC=/home/puffy/dropCast
 
+//Directory under which to collect all populated content
+FETCHCONTENT_BASE_DIR:PATH=/home/puffy/dropCast/build/_deps
+
+//Disables all attempts to download or update content and assumes
+// source dirs already exist
+FETCHCONTENT_FULLY_DISCONNECTED:BOOL=OFF
+
+//Enables QUIET option for all content population
+FETCHCONTENT_QUIET:BOOL=ON
+
+//When not empty, overrides where to find pre-populated content
+// for lua_src
+FETCHCONTENT_SOURCE_DIR_LUA_SRC:PATH=
+
+//Enables UPDATE_DISCONNECTED behavior for all content population
+FETCHCONTENT_UPDATES_DISCONNECTED:BOOL=OFF
+
+//Enables UPDATE_DISCONNECTED behavior just for population of lua_src
+FETCHCONTENT_UPDATES_DISCONNECTED_LUA_SRC:BOOL=OFF
+
 //Arguments to supply to pkg-config
 PKG_CONFIG_ARGN:STRING=
 
