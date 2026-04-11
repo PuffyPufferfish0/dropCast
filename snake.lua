@@ -125,7 +125,7 @@ function Update(dt)
     for i = 1, #snake do
         local s = snake[i]
         local r, g, b = 50, 200, 50 -- Body color
-        if i == 1 then r, g, b = 100, 255, 100 end -- Head color
+        if i == 1 then r, g, b = 100, 250, 100 end -- Head color
         if game_over then r, g, b = 100, 100, 100 end -- Turn grey if dead
         
         -- grid_size - 1 creates a nice grid pattern between the snake blocks

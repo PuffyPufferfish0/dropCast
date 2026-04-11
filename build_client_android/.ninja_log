@@ -1,0 +1,12 @@
+# ninja log v6
+2	74	1775867346311613644	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/nix/store/269h6gi4c20b0lzpwij3gnjrh75p7ywz-androidsdk/libexec/android-sdk/ndk/26.1.10909125/sources/android/native_app_glue/android_native_app_glue.c.o	c76c07bca50da38a
+2	75	1775867346311442022	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/utils.c.o	5764b8301b228d16
+1	266	1775867346310974927	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rshapes.c.o	7f4a8c8fcfaf8939
+2	622	1775867346312015623	CMakeFiles/main.dir/home/puffy/dropCast/Client/src/main.cpp.o	418ab90a6186ebad
+1	1071	1775867346311086195	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rtext.c.o	16d7698ce4bfa7a5
+1	1293	1775867346309796173	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rcore.c.o	b09ef2b584006a13
+1	3297	1775867346311221870	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rtextures.c.o	1bc6dcfd00664565
+1	4168	1775867346310856917	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rmodels.c.o	b68bcc4176d729d0
+2	6989	1775867346311800054	_deps/raylib-build/raylib/CMakeFiles/raylib.dir/raudio.c.o	c741a8f3b8e47ef3
+6989	7005	1775867353297539000	_deps/raylib-build/raylib/libraylib.a	cd3a3316a8c1407
+7005	7030	1775867353313538415	libmain.so	f27a2307af39c066

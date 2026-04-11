@@ -3,8 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
-#include <dirent.h> // For reading the Android filesystem
-
+#include <dirent.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -15,264 +14,267 @@ extern "C" {
     #include "lauxlib.h"
 }
 
-enum RenderCmdType { CMD_CLEAR_BG = 0, CMD_DRAW_RECT, CMD_DRAW_TEXT };
+// --- NETWORK PROTOCOL (MUST MATCH CLIENT EXACTLY) ---
+enum RenderCmdType { CMD_CLEAR_BG = 0, CMD_DRAW_RECT, CMD_DRAW_TEXT, CMD_LOAD_TEXTURE, CMD_DRAW_SPRITE };
 struct RenderCommand {
     int type;
-    float x, y, w, h;
-    float vx, vy;           // ADDED: Velocity sent to TV for lag-smoothing!
+    float x, y, w, h;       
+    float sw, sh;           
+    float vx, vy;           
+    int textureId;          
     unsigned char color[4]; 
     char text[32];          
 };
+
 struct RenderPacket {
     int count;
-    RenderCommand commands[20]; 
+    bool isLargeData;       
+    int dataSize;                // Added back to match Client
+    unsigned char rawData[2048]; 
+    RenderCommand commands[15]; 
 };
 
+// --- PHYSICS ENGINE ---
+struct PhysBody { int id; Rectangle rect; Vector2 velocity; bool isStatic; };
+std::vector<PhysBody> g_physWorld;
 RenderPacket g_outPacket;
-bool g_btnLeft = false;
-bool g_btnRight = false;
-bool g_btnJump = false;
+bool g_keys[3] = {false, false, false};
+lua_State* L = nullptr;
 
-void PushCommand(RenderPacket& packet, int type, float x, float y, float w, float h, float vx, float vy, Color c, const char* text = "") {
-    if (packet.count >= 20) return;
-    RenderCommand& cmd = packet.commands[packet.count];
-    cmd.type = type; cmd.x = x; cmd.y = y; cmd.w = w; cmd.h = h;
-    cmd.vx = vx; cmd.vy = vy; // Smooth it!
-    cmd.color[0] = c.r; cmd.color[1] = c.g; cmd.color[2] = c.b; cmd.color[3] = c.a;
-    if (text != nullptr) strncpy(cmd.text, text, 31);
-    packet.count++;
+// --- LUA BINDINGS ---
+int api_ClearPhysics(lua_State* l_ptr) { g_physWorld.clear(); return 0; }
+int api_AddBody(lua_State* l_ptr) {
+    float x = luaL_checknumber(l_ptr, 1); float y = luaL_checknumber(l_ptr, 2);
+    float w = luaL_checknumber(l_ptr, 3); float h = luaL_checknumber(l_ptr, 4);
+    bool s = lua_toboolean(l_ptr, 5);
+    g_physWorld.push_back({(int)g_physWorld.size(), {x,y,w,h}, {0,0}, s});
+    lua_pushinteger(l_ptr, g_physWorld.size() - 1); return 1;
 }
-
-// --- LUA API ---
-int api_ClearBG(lua_State* L) {
-    int r = luaL_checkinteger(L, 1); int g = luaL_checkinteger(L, 2);
-    int b = luaL_checkinteger(L, 3); int a = luaL_checkinteger(L, 4);
-    PushCommand(g_outPacket, CMD_CLEAR_BG, 0, 0, 0, 0, 0, 0, {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a});
+int api_GetBodyPos(lua_State* l_ptr) {
+    int id = luaL_checkinteger(l_ptr, 1);
+    if (id >= 0 && id < (int)g_physWorld.size()) {
+        lua_pushnumber(l_ptr, g_physWorld[id].rect.x); lua_pushnumber(l_ptr, g_physWorld[id].rect.y);
+        lua_pushnumber(l_ptr, g_physWorld[id].velocity.x); lua_pushnumber(l_ptr, g_physWorld[id].velocity.y);
+        return 4;
+    }
     return 0;
 }
-
-int api_DrawRect(lua_State* L) {
-    float x = luaL_checknumber(L, 1); float y = luaL_checknumber(L, 2);
-    float w = luaL_checknumber(L, 3); float h = luaL_checknumber(L, 4);
-    float vx = luaL_checknumber(L, 5); float vy = luaL_checknumber(L, 6); // NEW API REQUIRES VELOCITY
-    int r = luaL_checkinteger(L, 7); int g = luaL_checkinteger(L, 8);
-    int b = luaL_checkinteger(L, 9); int a = luaL_checkinteger(L, 10);
-    PushCommand(g_outPacket, CMD_DRAW_RECT, x, y, w, h, vx, vy, {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a});
+int api_SetBodyVel(lua_State* l_ptr) {
+    int id = luaL_checkinteger(l_ptr, 1);
+    float vx = luaL_checknumber(l_ptr, 2); float vy = luaL_checknumber(l_ptr, 3);
+    if (id >= 0 && id < (int)g_physWorld.size()) { g_physWorld[id].velocity.x = vx; g_physWorld[id].velocity.y = vy; }
     return 0;
 }
-
-int api_DrawText(lua_State* L) {
-    const char* text = luaL_checkstring(L, 1);
-    float x = luaL_checknumber(L, 2); float y = luaL_checknumber(L, 3);
-    float size = luaL_checknumber(L, 4);
-    int r = luaL_checkinteger(L, 5); int g = luaL_checkinteger(L, 6);
-    int b = luaL_checkinteger(L, 7); int a = luaL_checkinteger(L, 8);
-    PushCommand(g_outPacket, CMD_DRAW_TEXT, x, y, size, 0, 0, 0, {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a}, text);
+int api_ClearBG(lua_State* l_ptr) {
+    if (g_outPacket.count < 15) {
+        RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
+        c.type = CMD_CLEAR_BG; c.color[0]=luaL_checkinteger(l_ptr,1); c.color[1]=luaL_checkinteger(l_ptr,2); c.color[2]=luaL_checkinteger(l_ptr,3); c.color[3]=255;
+    }
     return 0;
 }
-
-int api_IsButtonDown(lua_State* L) {
-    int btnId = luaL_checkinteger(L, 1);
-    lua_pushboolean(L, (btnId == 0) ? g_btnLeft : (btnId == 1) ? g_btnRight : g_btnJump);
+int api_DrawRect(lua_State* l_ptr) {
+    if (g_outPacket.count < 15) {
+        RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
+        c.type = CMD_DRAW_RECT; c.x=luaL_checknumber(l_ptr,1); c.y=luaL_checknumber(l_ptr,2); c.w=luaL_checknumber(l_ptr,3); c.h=luaL_checknumber(l_ptr,4);
+        c.vx=luaL_checknumber(l_ptr,5); c.vy=luaL_checknumber(l_ptr,6);
+        c.color[0]=luaL_checkinteger(l_ptr,7); c.color[1]=luaL_checkinteger(l_ptr,8); c.color[2]=luaL_checkinteger(l_ptr,9); c.color[3]=255;
+    }
+    return 0;
+}
+int api_DrawText(lua_State* l_ptr) {
+    if (g_outPacket.count < 15) {
+        RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
+        c.type = CMD_DRAW_TEXT; strncpy(c.text, luaL_checkstring(l_ptr,1), 31); c.x=luaL_checknumber(l_ptr,2); c.y=luaL_checknumber(l_ptr,3); c.w=luaL_checknumber(l_ptr,4);
+        c.color[0]=luaL_checkinteger(l_ptr,5); c.color[1]=luaL_checkinteger(l_ptr,6); c.color[2]=luaL_checkinteger(l_ptr,7); c.color[3]=255;
+    }
+    return 0;
+}
+int api_IsButtonDown(lua_State* l_ptr) {
+    int id = luaL_checkinteger(l_ptr, 1);
+    lua_pushboolean(l_ptr, (id >= 0 && id < 3) ? g_keys[id] : false);
     return 1;
 }
 
-// --- VM MANAGER ---
-lua_State* L = nullptr;
-
-void InitLuaVM() {
-    if (L) lua_close(L);
-    L = luaL_newstate();
-    luaL_openlibs(L);
-    lua_newtable(L);
-    lua_pushcfunction(L, api_ClearBG); lua_setfield(L, -2, "ClearBG");
-    lua_pushcfunction(L, api_DrawRect); lua_setfield(L, -2, "DrawRect");
-    lua_pushcfunction(L, api_DrawText); lua_setfield(L, -2, "DrawText");
-    lua_pushcfunction(L, api_IsButtonDown); lua_setfield(L, -2, "IsButtonDown");
-    lua_setglobal(L, "DropCast");
+void StepPhysics(float dt) {
+    for (auto& b : g_physWorld) {
+        if (b.isStatic) continue;
+        b.velocity.y += 1000.0f * dt;
+        b.rect.x += b.velocity.x * dt; b.rect.y += b.velocity.y * dt;
+        for (auto& o : g_physWorld) {
+            if (&b == &o) continue;
+            if (CheckCollisionRecs(b.rect, o.rect)) {
+                if (b.velocity.y > 0 && b.rect.y < o.rect.y) { b.rect.y = o.rect.y - b.rect.height; b.velocity.y = 0; }
+            }
+        }
+    }
 }
 
-struct Button { Rectangle rect; const char* text; char val; };
+enum ShellTab { TAB_LIBRARY, TAB_SETTINGS, TAB_USER, TAB_PLAYING };
+struct ShellState {
+    ShellTab currentTab = TAB_SETTINGS; // Start on Settings so user can connect!
+    std::string gamesPath = "/storage/emulated/0/Download/DropCastGames";
+    std::string ip = "192.168.";
+    std::vector<std::string> gameList;
+    bool isConnected = false;
+};
 
-enum AppState { STATE_IP, STATE_LIBRARY, STATE_PLAY };
+struct UI_Button { Rectangle rect; const char* text; char val; };
 
 int main() {
-    InitWindow(800, 450, "DropCast Host - Engine");
+    InitWindow(800, 450, "DropCast Shell");
     SetTargetFPS(60);
 
-    AppState state = STATE_IP;
-    std::string ipAddress = "192.168."; 
-    int sock = -1;
+    ShellState shell;
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
     struct sockaddr_in clientAddr;
     memset(&clientAddr, 0, sizeof(clientAddr));
 
-    std::string gamesFolder = "/storage/emulated/0/Download/DropCastGames";
-    std::vector<std::string> gameFiles;
+    Rectangle sidebar = { 0, 0, 180, 450 };
 
+    std::vector<UI_Button> numpad = {
+        {{ 250, 130, 80, 60 }, "7", '7'}, {{ 350, 130, 80, 60 }, "8", '8'}, {{ 450, 130, 80, 60 }, "9", '9'},
+        {{ 250, 200, 80, 60 }, "4", '4'}, {{ 350, 200, 80, 60 }, "5", '5'}, {{ 450, 200, 80, 60 }, "6", '6'},
+        {{ 250, 270, 80, 60 }, "1", '1'}, {{ 350, 270, 80, 60 }, "2", '2'}, {{ 450, 270, 80, 60 }, "3", '3'},
+        {{ 250, 340, 80, 60 }, "DEL", '<'}, {{ 350, 340, 80, 60 }, "0", '0'}, {{ 450, 340, 80, 60 }, ".", '.'}
+    };
     Rectangle btnLeft = { 30, 320, 80, 80 };
     Rectangle btnRight = { 130, 320, 80, 80 };
     Rectangle btnJump = { 800 - 110, 320, 80, 80 };
-    Rectangle btnQuit = { 10, 10, 80, 40 };
-
-    std::vector<Button> numpad = {
-        {{ 250, 120, 80, 60 }, "7", '7'}, {{ 350, 120, 80, 60 }, "8", '8'}, {{ 450, 120, 80, 60 }, "9", '9'},
-        {{ 250, 190, 80, 60 }, "4", '4'}, {{ 350, 190, 80, 60 }, "5", '5'}, {{ 450, 190, 80, 60 }, "6", '6'},
-        {{ 250, 260, 80, 60 }, "1", '1'}, {{ 350, 260, 80, 60 }, "2", '2'}, {{ 450, 260, 80, 60 }, "3", '3'},
-        {{ 250, 330, 80, 60 }, "DEL", '<'}, {{ 350, 330, 80, 60 }, "0", '0'}, {{ 450, 330, 80, 60 }, ".", '.'}
-    };
-    Rectangle btnConnect = { 250, 400, 280, 40 };
 
     while (!WindowShouldClose()) {
-        float deltaTime = GetFrameTime();
+        float dt = GetFrameTime();
+        Vector2 m = GetMousePosition();
+        if (GetTouchPointCount() > 0) m = GetTouchPosition(0);
+        bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || (GetTouchPointCount() > 0 && IsGestureDetected(GESTURE_TAP));
 
-        // Check Input Globals
-        Vector2 tapPos = GetMousePosition();
-        if (GetTouchPointCount() > 0) tapPos = GetTouchPosition(0);
-        bool tapClick = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetTouchPointCount() > 0;
-        bool tapDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT) || GetTouchPointCount() > 0;
+        if (shell.currentTab == TAB_PLAYING) {
+            g_keys[0] = IsKeyDown(KEY_LEFT) || (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(m, btnLeft));
+            g_keys[1] = IsKeyDown(KEY_RIGHT) || (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(m, btnRight));
+            g_keys[2] = IsKeyDown(KEY_SPACE) || (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(m, btnJump));
 
-        if (state == STATE_IP) {
-            // --- 1. IP ENTRY MENU ---
-            int key = GetCharPressed();
-            while (key > 0) {
-                if ((key >= '0' && key <= '9') || key == '.') { if (ipAddress.length() < 15) ipAddress += (char)key; }
-                key = GetCharPressed();
-            }
-            if (IsKeyPressed(KEY_BACKSPACE) && ipAddress.length() > 0) ipAddress.pop_back();
-
-            static float tapCooldown = 0.0f;
-            if (tapClick && tapCooldown <= 0.0f) {
-                for (auto& btn : numpad) {
-                    if (CheckCollisionPointRec(tapPos, btn.rect)) {
-                        if (btn.val == '<' && ipAddress.length() > 0) ipAddress.pop_back();
-                        else if (btn.val != '<' && ipAddress.length() < 15) ipAddress += btn.val;
-                        tapCooldown = 0.2f; 
-                    }
-                }
-                if (CheckCollisionPointRec(tapPos, btnConnect) && ipAddress.length() > 0) {
-                    // Connect Socket
-                    sock = socket(AF_INET, SOCK_DGRAM, 0);
-                    clientAddr.sin_family = AF_INET;
-                    clientAddr.sin_port = htons(4444);
-                    clientAddr.sin_addr.s_addr = inet_addr(ipAddress.c_str());
-                    
-                    // Scan Directory
-                    gameFiles.clear();
-                    DIR* dir = opendir(gamesFolder.c_str());
-                    if (dir) {
-                        struct dirent* ent;
-                        while ((ent = readdir(dir)) != nullptr) {
-                            std::string fname = ent->d_name;
-                            if (fname.length() >= 4 && fname.substr(fname.length() - 4) == ".lua") {
-                                gameFiles.push_back(fname);
-                            }
-                        }
-                        closedir(dir);
-                    }
-                    state = STATE_LIBRARY; // Move to Game Browser
-                }
-            }
-            if (tapCooldown > 0.0f) tapCooldown -= deltaTime;
-
-            BeginDrawing();
-            ClearBackground(DARKBLUE);
-            DrawText("DROPCAST CONNECT", 250, 20, 30, WHITE);
-            DrawRectangle(250, 85, 280, 30, RAYWHITE);
-            DrawText(ipAddress.c_str(), 260, 90, 20, BLACK);
-            for (auto& btn : numpad) {
-                DrawRectangleRec(btn.rect, btn.val == '<' ? MAROON : DARKGRAY);
-                DrawText(btn.text, btn.rect.x + 30, btn.rect.y + 20, 20, WHITE);
-            }
-            DrawRectangleRec(btnConnect, GREEN);
-            DrawText("CONNECT TO TV", btnConnect.x + 60, btnConnect.y + 10, 20, BLACK);
-            EndDrawing();
-
-        } else if (state == STATE_LIBRARY) {
-            // --- 2. GAME BROWSER ---
-            BeginDrawing();
-            ClearBackground(DARKBLUE);
-            DrawText("DROPCAST LIBRARY", 250, 20, 30, WHITE);
-            DrawText(TextFormat("Looking in: %s", gamesFolder.c_str()), 10, 60, 15, LIGHTGRAY);
-
-            if (gameFiles.empty()) {
-                DrawText("No .lua games found!", 250, 200, 20, RED);
-                DrawText("1. Create 'DropCastGames' folder in Downloads.", 150, 240, 20, WHITE);
-                DrawText("2. Grant Storage Permissions in Android App Settings.", 150, 270, 20, WHITE);
-            } else {
-                for (int i = 0; i < gameFiles.size(); i++) {
-                    Rectangle itemRect = { 100, 120.0f + i * 50, 600, 40 };
-                    DrawRectangleRec(itemRect, LIGHTGRAY);
-                    DrawText(gameFiles[i].c_str(), 110, 130 + i * 50, 20, BLACK);
-
-                    if (tapClick && CheckCollisionPointRec(tapPos, itemRect)) {
-                        InitLuaVM();
-                        std::string fullPath = gamesFolder + "/" + gameFiles[i];
-                        if (luaL_dofile(L, fullPath.c_str()) != LUA_OK) {
-                            std::cerr << "Lua Load Error: " << lua_tostring(L, -1) << std::endl;
-                        } else {
-                            lua_getglobal(L, "Init");
-                            if (lua_isfunction(L, -1)) lua_pcall(L, 0, 0, 0); else lua_pop(L, 1);
-                            state = STATE_PLAY;
-                        }
-                    }
-                }
-            }
-            
-            Rectangle refreshBtn = { 650, 20, 120, 30 };
-            DrawRectangleRec(refreshBtn, GREEN);
-            DrawText("REFRESH", 670, 25, 20, BLACK);
-            if (tapClick && CheckCollisionPointRec(tapPos, refreshBtn)) {
-                gameFiles.clear();
-                DIR* dir = opendir(gamesFolder.c_str());
-                if (dir) {
-                    struct dirent* ent;
-                    while ((ent = readdir(dir)) != nullptr) {
-                        std::string fname = ent->d_name;
-                        if (fname.length() >= 4 && fname.substr(fname.length() - 4) == ".lua") { gameFiles.push_back(fname); }
-                    }
-                    closedir(dir);
-                }
-            }
-            EndDrawing();
-
-        } else if (state == STATE_PLAY) {
-            // --- 3. PLAYING GAME ---
-            g_btnLeft = IsKeyDown(KEY_LEFT); g_btnRight = IsKeyDown(KEY_RIGHT); g_btnJump = IsKeyPressed(KEY_SPACE);
-            if (tapDown) {
-                if (CheckCollisionPointRec(tapPos, btnLeft)) g_btnLeft = true;
-                if (CheckCollisionPointRec(tapPos, btnRight)) g_btnRight = true;
-                if (CheckCollisionPointRec(tapPos, btnJump) && tapClick) g_btnJump = true;
-                if (CheckCollisionPointRec(tapPos, btnQuit) && tapClick) state = STATE_LIBRARY; // Back to Menu!
-            }
-
+            StepPhysics(dt);
             g_outPacket.count = 0;
             if (L) {
-                lua_getglobal(L, "Update");
-                if (lua_isfunction(L, -1)) {
-                    lua_pushnumber(L, deltaTime);
-                    if (lua_pcall(L, 1, 0, 0) != LUA_OK) std::cerr << "Lua Error: " << lua_tostring(L, -1) << std::endl;
-                } else lua_pop(L, 1);
+                lua_getglobal(L, "Update"); lua_pushnumber(L, dt);
+                if (lua_pcall(L, 1, 0, 0) != LUA_OK) std::cerr << lua_tostring(L, -1) << std::endl;
             }
-
-            if (sock >= 0 && g_outPacket.count > 0) {
-                sendto(sock, &g_outPacket, sizeof(RenderPacket), 0, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
-            }
+            if (shell.isConnected) sendto(sock, &g_outPacket, sizeof(RenderPacket), 0, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
 
             BeginDrawing();
             ClearBackground(BLACK);
-            DrawRectangleRec(btnQuit, MAROON);
-            DrawText("QUIT", btnQuit.x + 15, btnQuit.y + 10, 20, WHITE);
-            DrawText("LUA VM ACTIVE - LOOK AT THE TV!", 230, 150, 20, GREEN);
+            DrawText("PLAYING - TAP TOP TO QUIT", 300, 20, 15, DARKGRAY);
+            if (click && m.y < 50) shell.currentTab = TAB_LIBRARY;
 
-            DrawRectangleRec(btnLeft, Fade(DARKGRAY, 0.5f)); DrawText("<", btnLeft.x + 30, btnLeft.y + 25, 40, WHITE);
-            DrawRectangleRec(btnRight, Fade(DARKGRAY, 0.5f)); DrawText(">", btnRight.x + 30, btnRight.y + 25, 40, WHITE);
-            DrawRectangleRec(btnJump, Fade(MAROON, 0.5f)); DrawText("^", btnJump.x + 30, btnJump.y + 30, 40, WHITE);
+            DrawRectangleRec(btnLeft, Fade(GRAY, 0.5f));
+            DrawText("<", btnLeft.x + 30, btnLeft.y + 25, 40, WHITE);
+            DrawRectangleRec(btnRight, Fade(GRAY, 0.5f));
+            DrawText(">", btnRight.x + 30, btnRight.y + 25, 40, WHITE);
+            DrawRectangleRec(btnJump, Fade(MAROON, 0.5f));
+            DrawText("^", btnJump.x + 30, btnJump.y + 30, 40, WHITE);
+            
+            EndDrawing();
+        } else {
+            BeginDrawing();
+            ClearBackground({30, 30, 45, 255});
+            DrawRectangleRec(sidebar, {20, 20, 30, 255});
+
+            auto DrawTab = [&](const char* label, ShellTab t, int y) {
+                Rectangle r = { 10, (float)y, 160, 40 };
+                bool hover = CheckCollisionPointRec(m, r);
+                DrawRectangleRec(r, (shell.currentTab == t) ? BLUE : (hover ? DARKGRAY : BLANK));
+                DrawText(label, 25, y + 10, 20, WHITE);
+                if (click && hover) shell.currentTab = t;
+            };
+
+            DrawText("DROPCAST", 20, 20, 25, SKYBLUE);
+            DrawTab("LIBRARY", TAB_LIBRARY, 80);
+            DrawTab("SETTINGS", TAB_SETTINGS, 130);
+            DrawTab("USER", TAB_USER, 180);
+
+            if (shell.currentTab == TAB_LIBRARY) {
+                DrawText("GAMES LIBRARY", 200, 20, 30, WHITE);
+                
+                Rectangle refreshRect = { 200, 60, 120, 30 };
+                DrawText("Refresh", refreshRect.x, refreshRect.y, 20, GREEN);
+                if (click && CheckCollisionPointRec(m, refreshRect)) {
+                    shell.gameList.clear();
+                    DIR* d = opendir(shell.gamesPath.c_str());
+                    if (d) {
+                        struct dirent* e;
+                        while ((e = readdir(d))) {
+                            std::string s = e->d_name;
+                            if (s.size() > 4 && s.substr(s.size()-4) == ".lua") shell.gameList.push_back(s);
+                        }
+                        closedir(d);
+                    }
+                }
+
+                if (shell.gameList.empty()) {
+                    DrawText("Folder empty or not set.", 250, 200, 20, GRAY);
+                }
+
+                for (int i = 0; i < (int)shell.gameList.size(); i++) {
+                    Rectangle r = { 200, 100.0f + i * 50, 580, 45 };
+                    DrawRectangleRec(r, {50, 50, 70, 255});
+                    DrawText(shell.gameList[i].c_str(), 220, 112 + i * 50, 20, WHITE);
+                    if (click && CheckCollisionPointRec(m, r)) {
+                        if (L) lua_close(L);
+                        L = luaL_newstate(); luaL_openlibs(L);
+                        lua_newtable(L);
+                        lua_pushcfunction(L, api_AddBody); lua_setfield(L,-2,"AddBody");
+                        lua_pushcfunction(L, api_GetBodyPos); lua_setfield(L,-2,"GetBodyPos");
+                        lua_pushcfunction(L, api_SetBodyVel); lua_setfield(L,-2,"SetBodyVel");
+                        lua_pushcfunction(L, api_ClearPhysics); lua_setfield(L,-2,"ClearPhysics");
+                        lua_pushcfunction(L, api_ClearBG); lua_setfield(L,-2,"ClearBG");
+                        lua_pushcfunction(L, api_DrawRect); lua_setfield(L,-2,"DrawRect"); // FIXED: 'l' typo
+                        lua_pushcfunction(L, api_DrawText); lua_setfield(L,-2,"DrawText");
+                        lua_pushcfunction(L, api_IsButtonDown); lua_setfield(L,-2,"IsButtonDown");
+                        lua_setglobal(L, "DropCast");
+                        std::string p = shell.gamesPath + "/" + shell.gameList[i];
+                        if (luaL_dofile(L, p.c_str()) == LUA_OK) {
+                            lua_getglobal(L, "Init"); lua_pcall(L, 0, 0, 0);
+                            shell.currentTab = TAB_PLAYING;
+                        }
+                    }
+                }
+            } else if (shell.currentTab == TAB_SETTINGS) {
+                DrawText("SETTINGS - CONNECT TO TV", 200, 20, 30, WHITE);
+                DrawText(TextFormat("Games Path: %s", shell.gamesPath.c_str()), 200, 60, 15, GRAY);
+                
+                int key = GetCharPressed();
+                while (key > 0) {
+                    if ((key >= '0' && key <= '9') || key == '.') if (shell.ip.length() < 15) shell.ip += (char)key;
+                    key = GetCharPressed();
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && shell.ip.length() > 0) shell.ip.pop_back();
+
+                DrawRectangle(200, 85, 280, 35, RAYWHITE);
+                DrawText(shell.ip.c_str(), 210, 92, 20, BLACK);
+
+                for (auto& b : numpad) {
+                    DrawRectangleRec(b.rect, GRAY);
+                    DrawText(b.text, b.rect.x + 25, b.rect.y + 20, 20, WHITE);
+                    if (click && CheckCollisionPointRec(m, b.rect)) {
+                        if (b.val == '<' && shell.ip.length() > 0) shell.ip.pop_back();
+                        else if (b.val != '<' && shell.ip.length() < 15) shell.ip += b.val;
+                    }
+                }
+                
+                Rectangle btnConn = { 550, 150, 200, 60 };
+                DrawRectangleRec(btnConn, shell.isConnected ? GREEN : MAROON);
+                DrawText(shell.isConnected ? "CONNECTED" : "CONNECT TV", 570, 170, 20, BLACK);
+                if (click && CheckCollisionPointRec(m, btnConn)) {
+                    clientAddr.sin_family = AF_INET; clientAddr.sin_port = htons(4444);
+                    clientAddr.sin_addr.s_addr = inet_addr(shell.ip.c_str());
+                    shell.isConnected = true;
+                    shell.currentTab = TAB_LIBRARY; // Auto-switch to library when connected
+                }
+            }
             EndDrawing();
         }
     }
-
     if (L) lua_close(L);
-    if (sock >= 0) close(sock);
+    close(sock);
     CloseWindow();
     return 0;
 }

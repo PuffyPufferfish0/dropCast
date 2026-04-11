@@ -1,0 +1,21 @@
+# ninja log v6
+0	10	1775867343228910399	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-mkdir	95721a43ac55ac0
+0	10	1775867343228910399	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-mkdir	95721a43ac55ac0
+10	2927	1775867346145802237	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-download	9977a0316c56fd80
+10	2927	1775867346145802237	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-download	9977a0316c56fd80
+2927	2936	1775867346154801905	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-update	caf295d7afff14e7
+2927	2936	1775867346154801905	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-update	caf295d7afff14e7
+2936	2946	1775867346163801572	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-patch	76258b6575ccc3da
+2936	2946	1775867346163801572	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-patch	76258b6575ccc3da
+2946	2956	1775867346174801165	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-configure	aac17dc8e8c16eed
+2946	2956	1775867346174801165	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-configure	aac17dc8e8c16eed
+2956	2967	1775867346185800758	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-build	dacfadc38cce382c
+2956	2967	1775867346185800758	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-build	dacfadc38cce382c
+2967	2977	1775867346194800426	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-install	57a6e08d723f95cd
+2967	2977	1775867346194800426	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-install	57a6e08d723f95cd
+2977	2987	1775867346205800019	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-test	85e2a105afe35e0d
+2977	2987	1775867346205800019	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-test	85e2a105afe35e0d
+2987	3004	1775867346221799427	CMakeFiles/raylib-populate-complete	ed57bd5ed82783c8
+2987	3004	1775867346221799427	raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-done	ed57bd5ed82783c8
+2987	3004	1775867346221799427	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/CMakeFiles/raylib-populate-complete	ed57bd5ed82783c8
+2987	3004	1775867346221799427	/home/puffy/dropCast/build_client_android/_deps/raylib-subbuild/raylib-populate-prefix/src/raylib-populate-stamp/raylib-populate-done	ed57bd5ed82783c8
