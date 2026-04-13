@@ -14,32 +14,38 @@ extern "C" {
     #include "lauxlib.h"
 }
 
-// --- NETWORK PROTOCOL (MUST MATCH CLIENT EXACTLY) ---
-enum RenderCmdType { CMD_CLEAR_BG = 0, CMD_DRAW_RECT, CMD_DRAW_TEXT, CMD_LOAD_TEXTURE, CMD_DRAW_SPRITE };
+enum RenderCmdType { CMD_CLEAR_BG = 0, CMD_DRAW_RECT, CMD_DRAW_TEXT, CMD_DRAW_SPRITE };
 struct RenderCommand {
     int type;
     float x, y, w, h;       
-    float sw, sh;           
+    float sx, sy, sw, sh;           
     float vx, vy;           
     int textureId;          
     unsigned char color[4]; 
-    char text[32];          
+    char text[32];              
 };
 
 struct RenderPacket {
+    int packetType; 
     int count;
-    bool isLargeData;       
-    int dataSize;                // Added back to match Client
-    unsigned char rawData[2048]; 
-    RenderCommand commands[15]; 
+    int assetId;
+    int totalSize;
+    int chunkOffset;
+    int chunkSize;
+    unsigned char rawData[512]; 
+    RenderCommand commands[10]; 
 };
 
-// --- PHYSICS ENGINE ---
 struct PhysBody { int id; Rectangle rect; Vector2 velocity; bool isStatic; };
+
 std::vector<PhysBody> g_physWorld;
 RenderPacket g_outPacket;
 bool g_keys[3] = {false, false, false};
 lua_State* L = nullptr;
+
+int g_sock = -1;
+struct sockaddr_in g_clientAddr;
+std::string g_gamesPath = "/storage/emulated/0/Download/DropCastGames";
 
 // --- LUA BINDINGS ---
 int api_ClearPhysics(lua_State* l_ptr) { g_physWorld.clear(); return 0; }
@@ -66,14 +72,14 @@ int api_SetBodyVel(lua_State* l_ptr) {
     return 0;
 }
 int api_ClearBG(lua_State* l_ptr) {
-    if (g_outPacket.count < 15) {
+    if (g_outPacket.count < 10) {
         RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
         c.type = CMD_CLEAR_BG; c.color[0]=luaL_checkinteger(l_ptr,1); c.color[1]=luaL_checkinteger(l_ptr,2); c.color[2]=luaL_checkinteger(l_ptr,3); c.color[3]=255;
     }
     return 0;
 }
 int api_DrawRect(lua_State* l_ptr) {
-    if (g_outPacket.count < 15) {
+    if (g_outPacket.count < 10) {
         RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
         c.type = CMD_DRAW_RECT; c.x=luaL_checknumber(l_ptr,1); c.y=luaL_checknumber(l_ptr,2); c.w=luaL_checknumber(l_ptr,3); c.h=luaL_checknumber(l_ptr,4);
         c.vx=luaL_checknumber(l_ptr,5); c.vy=luaL_checknumber(l_ptr,6);
@@ -82,13 +88,63 @@ int api_DrawRect(lua_State* l_ptr) {
     return 0;
 }
 int api_DrawText(lua_State* l_ptr) {
-    if (g_outPacket.count < 15) {
+    if (g_outPacket.count < 10) {
         RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
         c.type = CMD_DRAW_TEXT; strncpy(c.text, luaL_checkstring(l_ptr,1), 31); c.x=luaL_checknumber(l_ptr,2); c.y=luaL_checknumber(l_ptr,3); c.w=luaL_checknumber(l_ptr,4);
         c.color[0]=luaL_checkinteger(l_ptr,5); c.color[1]=luaL_checkinteger(l_ptr,6); c.color[2]=luaL_checkinteger(l_ptr,7); c.color[3]=255;
     }
     return 0;
 }
+
+int api_LoadTexture(lua_State* l_ptr) {
+    int id = luaL_checkinteger(l_ptr, 1);
+    std::string path = luaL_checkstring(l_ptr, 2);
+    std::string fullPath = g_gamesPath + "/" + path;
+    
+    FILE* f = fopen(fullPath.c_str(), "rb");
+    if (!f) return 0;
+    
+    fseek(f, 0, SEEK_END);
+    int size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    std::vector<unsigned char> buffer(size);
+    size_t rb = fread(buffer.data(), 1, size, f);
+    (void)rb;
+    fclose(f);
+    
+    int offset = 0;
+    while (offset < size) {
+        RenderPacket pkt;
+        memset(&pkt, 0, sizeof(RenderPacket));
+        pkt.packetType = 1; 
+        pkt.assetId = id;
+        pkt.totalSize = size;
+        pkt.chunkOffset = offset;
+        pkt.chunkSize = std::min(512, size - offset);
+        memcpy(pkt.rawData, buffer.data() + offset, pkt.chunkSize);
+        
+        sendto(g_sock, &pkt, sizeof(RenderPacket), 0, (struct sockaddr*)&g_clientAddr, sizeof(g_clientAddr));
+        offset += pkt.chunkSize;
+        usleep(4000); 
+    }
+    return 0;
+}
+
+int api_DrawSprite(lua_State* l_ptr) {
+    if (g_outPacket.count < 10) {
+        RenderCommand& c = g_outPacket.commands[g_outPacket.count++];
+        c.type = CMD_DRAW_SPRITE;
+        c.textureId = luaL_checkinteger(l_ptr, 1);
+        c.sx = luaL_checknumber(l_ptr, 2); c.sy = luaL_checknumber(l_ptr, 3);
+        c.sw = luaL_checknumber(l_ptr, 4); c.sh = luaL_checknumber(l_ptr, 5);
+        c.x = luaL_checknumber(l_ptr, 6);  c.y = luaL_checknumber(l_ptr, 7);
+        c.w = luaL_checknumber(l_ptr, 8);  c.h = luaL_checknumber(l_ptr, 9);
+        c.vx = luaL_checknumber(l_ptr, 10); c.vy = luaL_checknumber(l_ptr, 11);
+    }
+    return 0;
+}
+
 int api_IsButtonDown(lua_State* l_ptr) {
     int id = luaL_checkinteger(l_ptr, 1);
     lua_pushboolean(l_ptr, (id >= 0 && id < 3) ? g_keys[id] : false);
@@ -111,8 +167,7 @@ void StepPhysics(float dt) {
 
 enum ShellTab { TAB_LIBRARY, TAB_SETTINGS, TAB_USER, TAB_PLAYING };
 struct ShellState {
-    ShellTab currentTab = TAB_SETTINGS; // Start on Settings so user can connect!
-    std::string gamesPath = "/storage/emulated/0/Download/DropCastGames";
+    ShellTab currentTab = TAB_SETTINGS; 
     std::string ip = "192.168.";
     std::vector<std::string> gameList;
     bool isConnected = false;
@@ -125,9 +180,8 @@ int main() {
     SetTargetFPS(60);
 
     ShellState shell;
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    struct sockaddr_in clientAddr;
-    memset(&clientAddr, 0, sizeof(clientAddr));
+    g_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    memset(&g_clientAddr, 0, sizeof(g_clientAddr));
 
     Rectangle sidebar = { 0, 0, 180, 450 };
 
@@ -154,11 +208,12 @@ int main() {
 
             StepPhysics(dt);
             g_outPacket.count = 0;
+            g_outPacket.packetType = 0; // Game packet type
             if (L) {
                 lua_getglobal(L, "Update"); lua_pushnumber(L, dt);
                 if (lua_pcall(L, 1, 0, 0) != LUA_OK) std::cerr << lua_tostring(L, -1) << std::endl;
             }
-            if (shell.isConnected) sendto(sock, &g_outPacket, sizeof(RenderPacket), 0, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
+            if (shell.isConnected) sendto(g_sock, &g_outPacket, sizeof(RenderPacket), 0, (struct sockaddr*)&g_clientAddr, sizeof(g_clientAddr));
 
             BeginDrawing();
             ClearBackground(BLACK);
@@ -198,7 +253,7 @@ int main() {
                 DrawText("Refresh", refreshRect.x, refreshRect.y, 20, GREEN);
                 if (click && CheckCollisionPointRec(m, refreshRect)) {
                     shell.gameList.clear();
-                    DIR* d = opendir(shell.gamesPath.c_str());
+                    DIR* d = opendir(g_gamesPath.c_str());
                     if (d) {
                         struct dirent* e;
                         while ((e = readdir(d))) {
@@ -226,11 +281,13 @@ int main() {
                         lua_pushcfunction(L, api_SetBodyVel); lua_setfield(L,-2,"SetBodyVel");
                         lua_pushcfunction(L, api_ClearPhysics); lua_setfield(L,-2,"ClearPhysics");
                         lua_pushcfunction(L, api_ClearBG); lua_setfield(L,-2,"ClearBG");
-                        lua_pushcfunction(L, api_DrawRect); lua_setfield(L,-2,"DrawRect"); // FIXED: 'l' typo
+                        lua_pushcfunction(L, api_DrawRect); lua_setfield(L,-2,"DrawRect"); 
                         lua_pushcfunction(L, api_DrawText); lua_setfield(L,-2,"DrawText");
+                        lua_pushcfunction(L, api_LoadTexture); lua_setfield(L,-2,"LoadTexture");
+                        lua_pushcfunction(L, api_DrawSprite); lua_setfield(L,-2,"DrawSprite");
                         lua_pushcfunction(L, api_IsButtonDown); lua_setfield(L,-2,"IsButtonDown");
                         lua_setglobal(L, "DropCast");
-                        std::string p = shell.gamesPath + "/" + shell.gameList[i];
+                        std::string p = g_gamesPath + "/" + shell.gameList[i];
                         if (luaL_dofile(L, p.c_str()) == LUA_OK) {
                             lua_getglobal(L, "Init"); lua_pcall(L, 0, 0, 0);
                             shell.currentTab = TAB_PLAYING;
@@ -239,7 +296,7 @@ int main() {
                 }
             } else if (shell.currentTab == TAB_SETTINGS) {
                 DrawText("SETTINGS - CONNECT TO TV", 200, 20, 30, WHITE);
-                DrawText(TextFormat("Games Path: %s", shell.gamesPath.c_str()), 200, 60, 15, GRAY);
+                DrawText(TextFormat("Games Path: %s", g_gamesPath.c_str()), 200, 60, 15, GRAY);
                 
                 int key = GetCharPressed();
                 while (key > 0) {
@@ -264,17 +321,17 @@ int main() {
                 DrawRectangleRec(btnConn, shell.isConnected ? GREEN : MAROON);
                 DrawText(shell.isConnected ? "CONNECTED" : "CONNECT TV", 570, 170, 20, BLACK);
                 if (click && CheckCollisionPointRec(m, btnConn)) {
-                    clientAddr.sin_family = AF_INET; clientAddr.sin_port = htons(4444);
-                    clientAddr.sin_addr.s_addr = inet_addr(shell.ip.c_str());
+                    g_clientAddr.sin_family = AF_INET; g_clientAddr.sin_port = htons(4444);
+                    g_clientAddr.sin_addr.s_addr = inet_addr(shell.ip.c_str());
                     shell.isConnected = true;
-                    shell.currentTab = TAB_LIBRARY; // Auto-switch to library when connected
+                    shell.currentTab = TAB_LIBRARY;
                 }
             }
             EndDrawing();
         }
     }
     if (L) lua_close(L);
-    close(sock);
+    close(g_sock);
     CloseWindow();
     return 0;
 }

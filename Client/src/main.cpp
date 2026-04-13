@@ -3,36 +3,35 @@
 #include <vector>
 #include <map>
 #include <cstring>
-
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
 
-enum RenderCmdType { 
-    CMD_CLEAR_BG = 0, 
-    CMD_DRAW_RECT, 
-    CMD_DRAW_TEXT,
-    CMD_LOAD_TEXTURE,   
-    CMD_DRAW_SPRITE     
-};
+enum RenderCmdType { CMD_CLEAR_BG = 0, CMD_DRAW_RECT, CMD_DRAW_TEXT, CMD_DRAW_SPRITE };
 
 struct RenderCommand {
     int type;
     float x, y, w, h;       
-    float sw, sh;           
+    float sx, sy, sw, sh;   
     float vx, vy;           
     int textureId;          
     unsigned char color[4]; 
-    char text[32];          
+    char text[32];              
 };
 
+// CRITICAL FIX: Shrunk the packet to ~1400 bytes total to survive UDP/Wi-Fi MTU limits
 struct RenderPacket {
+    int packetType; // 0 = Game Render, 1 = Asset Chunk
     int count;
-    bool isLargeData;       
-    int dataSize;
-    unsigned char rawData[2048]; 
-    RenderCommand commands[15]; 
+    
+    int assetId;
+    int totalSize;
+    int chunkOffset;
+    int chunkSize;
+    unsigned char rawData[512]; 
+    
+    RenderCommand commands[10]; 
 };
 
 int main() {
@@ -45,38 +44,54 @@ int main() {
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(4444);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    
-    if (bind(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-        std::cerr << "Port 4444 busy!" << std::endl;
-        return -1;
-    }
+    bind(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
     fcntl(sock, F_SETFL, O_NONBLOCK); 
 
     std::map<int, Texture2D> textureLibrary;
+    std::map<int, std::vector<unsigned char>> assetBuffers;
+    std::map<int, int> bytesReceived;
+
     RenderPacket lastPacket = { 0 };
     bool connected = false;
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
         
-        RenderPacket incomingPacket;
+        RenderPacket p;
         while (true) {
-            int bytesRead = recvfrom(sock, &incomingPacket, sizeof(RenderPacket), 0, NULL, NULL);
+            int bytesRead = recvfrom(sock, &p, sizeof(RenderPacket), 0, NULL, NULL);
             if (bytesRead == sizeof(RenderPacket)) {
-                if (incomingPacket.isLargeData) {
-                    // FIX: Added PIXELFORMAT_ prefix
-                    Image img = { incomingPacket.rawData, 64, 64, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
-                    int id = incomingPacket.commands[0].textureId;
-                    if (textureLibrary.count(id)) UnloadTexture(textureLibrary[id]);
-                    textureLibrary[id] = LoadTextureFromImage(img);
-                } else {
-                    lastPacket = incomingPacket;
-                }
                 connected = true;
+                if (p.packetType == 1) {
+                    // --- ASSET RECONSTRUCTION ---
+                    int id = p.assetId;
+                    if (assetBuffers[id].size() != p.totalSize) {
+                        assetBuffers[id].resize(p.totalSize);
+                        bytesReceived[id] = 0;
+                    }
+                    
+                    memcpy(assetBuffers[id].data() + p.chunkOffset, p.rawData, p.chunkSize);
+                    bytesReceived[id] += p.chunkSize;
+                    
+                    // Decode image once all chunks arrive
+                    if (bytesReceived[id] >= p.totalSize) {
+                        Image img = LoadImageFromMemory(".png", assetBuffers[id].data(), p.totalSize);
+                        if (img.data != NULL) {
+                            if (textureLibrary.count(id)) UnloadTexture(textureLibrary[id]);
+                            textureLibrary[id] = LoadTextureFromImage(img);
+                            UnloadImage(img);
+                            std::cout << "SUCCESS: Asset " << id << " reconstructed and loaded!" << std::endl;
+                        } else {
+                            std::cerr << "ERROR: Failed to decode image data!" << std::endl;
+                        }
+                        bytesReceived[id] = 0; 
+                    }
+                } else {
+                    lastPacket = p;
+                }
             } else break;
         }
 
-        // Dead Reckoning for lag-free movement
         if (connected) {
             for (int i = 0; i < lastPacket.count; i++) {
                 lastPacket.commands[i].x += lastPacket.commands[i].vx * dt;
@@ -95,9 +110,12 @@ int main() {
                 else if (cmd.type == CMD_DRAW_TEXT) DrawText(cmd.text, cmd.x, cmd.y, (int)cmd.w, c);
                 else if (cmd.type == CMD_DRAW_SPRITE) {
                     if (textureLibrary.count(cmd.textureId)) {
-                        Rectangle src = { cmd.w, cmd.h, cmd.sw, cmd.sh };
-                        Rectangle dest = { cmd.x, cmd.y, cmd.sw, cmd.sh };
+                        Rectangle src = { cmd.sx, cmd.sy, cmd.sw, cmd.sh };
+                        Rectangle dest = { cmd.x, cmd.y, cmd.w, cmd.h };
                         DrawTexturePro(textureLibrary[cmd.textureId], src, dest, {0,0}, 0, WHITE);
+                    } else {
+                        DrawRectangleRec({cmd.x, cmd.y, cmd.w, cmd.h}, GRAY);
+                        DrawText("Syncing...", cmd.x, cmd.y, 10, WHITE);
                     }
                 }
             }
@@ -108,8 +126,6 @@ int main() {
         DrawFPS(720, 10);
         EndDrawing();
     }
-    
-    for (auto const& [id, tex] : textureLibrary) UnloadTexture(tex);
     close(sock);
     CloseWindow();
     return 0;
