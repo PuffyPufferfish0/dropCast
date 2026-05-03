@@ -22,5 +22,5 @@ HolyOrifice is the first real game I am working on for dropcast. I might make a 
 ![Image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/Profiles.jpg) Where you can change profiles  
 
 ## Profiles
-
+I want devlopers to be able to design custom controller profiles for different games, and for those profiles to be semi-compatible with other games.
 
