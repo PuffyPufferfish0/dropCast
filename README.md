@@ -9,13 +9,12 @@ using UDP (_User Datagram Protocol_) the host sends the game to the client. The 
 ## Games
 ### Jump
 jump is a demo that I used to test latency  
-[Image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/Jump_Demo.gif)
+<img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/fc2bf1fe-1e48-42aa-8618-64b99a75fa6b" />
+
 ### Snake
 Snake was a game that I _vibecoded_ to test multigame implementation, as well as profile swapping.  
-[Image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/Snake_Gif.gif)
 ### holyOriface
 HolyOrifice is the first real game I am working on for dropcast. I might make a separate github for it.  
-[Image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/holyOrifiace_Demo.gif)  
 
   
 ## Menu
