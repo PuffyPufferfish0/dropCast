@@ -16,11 +16,11 @@ HolyOrifice is the first real game I am working on for dropcast. I might make a 
 ## Menu
   
 ### Library
-[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/library_menu.jpg?raw=true) Where you can choose your games  
+[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/library_menu.jpg) Where you can choose your games  
 ### Settings
-[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/serverConnection.jpg?raw=true) Where you manage connection  
+[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/serverConnection.jpg) Where you manage connection  
 ### User
-[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/Profiles.jpg?raw=true) Where you can change profiles  
+[image](https://github.com/PuffyPufferfish0/dropCast/blob/main/githubLibrary/Profiles.jpg) Where you can change profiles  
 
 ## Profiles
 
