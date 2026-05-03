@@ -9,8 +9,7 @@ using UDP (_User Datagram Protocol_) the host sends the game to the client. The 
 ## Games
 ### Jump
 jump is a demo that I used to test latency  
-<img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/fc2bf1fe-1e48-42aa-8618-64b99a75fa6b" />
-
+![gif1](githubLibrary/Jump_Demo.gif)
 ### Snake
 Snake was a game that I _vibecoded_ to test multigame implementation, as well as profile swapping.  
 ### holyOriface
